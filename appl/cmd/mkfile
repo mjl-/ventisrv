@@ -1,0 +1,31 @@
+<../../mkconfig
+
+DIRS=\
+	venti\
+
+TARG=\
+        ventry.dis\
+        vcache.dis\
+        vtest.dis\
+        ventisrv.dis\
+
+MODULES=\
+
+SYSMODULES=\
+	arg.m\
+	bufio.m\
+	daytime.m\
+	draw.m\
+	keyring.m\
+	rabin.m\
+	string.m\
+	styx.m\
+	styxservers.m\
+	sys.m\
+	vac.m\
+	venti.m\
+
+DISBIN=$ROOT/dis
+
+<$ROOT/mkfiles/mkdis
+<$ROOT/mkfiles/mksubdirs

@@ -1,0 +1,13 @@
+NPROC = 1
+FILES = \
+	ventisrv-fileformat.ps\
+
+all:V: $FILES
+
+%.ps:D:	%.ms
+	cat $stem.ms | tbl | troff -ms | lp -dstdout > $target
+	# for use with p9p:
+	#cat $stem.ms | 9 tbl | 9 troff -ms -Tutf | tr2post | psfonts >$target
+
+%.pdf: %.ps
+	ps2pdf <$stem.ps >$stem.pdf

@@ -1,0 +1,8 @@
+<../mkconfig
+
+MAN=\
+	1/vcache\
+	1/venti\
+	8/ventisrv\
+
+<mkman

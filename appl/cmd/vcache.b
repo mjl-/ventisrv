@@ -5,19 +5,18 @@
 implement Vcache;
 
 include "sys.m";
+	sys: Sys;
+	sprint: import sys;
 include "draw.m";
 include "arg.m";
 include "string.m";
+	str: String;
 include "keyring.m";
+	kr: Keyring;
 include "venti.m";
+	venti: Venti;
+	Score, Session, Vmsg: import venti;
 
-sys: Sys;
-str: String;
-keyring: Keyring;
-venti: Venti;
-
-pctl, print, sprint, fprint, fildes: import sys;
-Score, Session, Vmsg: import venti;
 
 Vcache: module {
 	init:	fn(nil: ref Draw->Context, args: list of string);
@@ -68,7 +67,7 @@ init(nil: ref Draw->Context, args: list of string)
 	sys = load Sys Sys->PATH;
 	arg := load Arg Arg->PATH;
 	str = load String String->PATH;
-	keyring = load Keyring Keyring->PATH;
+	kr = load Keyring Keyring->PATH;
 	venti = load Venti Venti->PATH;
 	venti->init();
 
@@ -82,12 +81,12 @@ init(nil: ref Draw->Context, args: list of string)
 		's' =>	maxcachesize = int arg->earg();
 		'S' =>	(statsdir, statsfile) = str->splitstrr(arg->earg(), "/");
 			if(statsfile == nil) {
-				fprint(fildes(2), "bad statsfile\n");
+				sys->fprint(sys->fildes(2), "bad statsfile\n");
 				arg->usage();
 			}
 		'v' =>	vflag++;
 		'w' =>	wflag = 1;
-		* =>	fprint(fildes(2), "bad option: -%c\n", c);
+		* =>	sys->fprint(sys->fildes(2), "bad option: -%c\n", c);
 			arg->usage();
 		}
 	args = arg->argv();
@@ -391,8 +390,8 @@ needconn(c: ref Conn, cc: ref Client): int
 
 sha1(d: array of byte): array of byte
 {
-	r := array[keyring->SHA1dlen] of byte;
-	keyring->sha1(d, len d, r, nil);
+	r := array[kr->SHA1dlen] of byte;
+	kr->sha1(d, len d, r, nil);
 	return r;
 }
 
@@ -436,7 +435,7 @@ central()
 
 	fio := sys->file2chan(statsdir, statsfile);
 	if(fio == nil) {
-		fprint(fildes(2), "file2chan: %r;  not serving statistics\n");
+		sys->fprint(sys->fildes(2), "file2chan: %r;  not serving statistics\n");
 		fio = ref sys->FileIO(chan of (int, int, int, sys->Rread), chan of (int, array of byte, int, sys->Rwrite));
 	} else
 		if(dflag) debug(sprint("file2chan: serving %s%s", statsdir, statsfile));
@@ -713,7 +712,7 @@ readline(fd: ref Sys->FD): array of byte
 
 handshake(fd: ref Sys->FD): string
 {
-	if(fprint(fd, "venti-02-vcache\n") < 0)
+	if(sys->fprint(fd, "venti-02-vcache\n") < 0)
 		return sprint("writing version: %r");
 
 	d := readline(fd);
@@ -746,7 +745,7 @@ lreader(fd: ref Sys->FD)
 	}
 	debug("lreader: have handshake");
 
-	rpid := pctl(0, nil);
+	rpid := sys->pctl(0, nil);
 	spawn lwriter(fd, rpid, pidc := chan of int, respc := chan[256] of ref Vmsg);
 	wpid := <- pidc;
 
@@ -769,7 +768,7 @@ lreader(fd: ref Sys->FD)
 
 lwriter(fd: ref Sys->FD, rpid: int, pidc: chan of int, respc: chan of ref Vmsg)
 {
-	pidc <-= pctl(0, nil);
+	pidc <-= sys->pctl(0, nil);
 	for(;;) {
 		vmsg := <- respc;
 		if(vmsg == nil)
@@ -786,7 +785,7 @@ lwriter(fd: ref Sys->FD, rpid: int, pidc: chan of int, respc: chan of ref Vmsg)
 
 vreader(pidc: chan of int, fd: ref Sys->FD, inc: chan of ref Vmsg)
 {
-	pidc <-= pctl(0, nil);
+	pidc <-= sys->pctl(0, nil);
 	for(;;) {
 		(vmsg, err) := Vmsg.read(fd);
 		if(vmsg != nil && vmsg.istmsg)
@@ -805,7 +804,7 @@ if(vmsg != nil)
 
 vwriter(pidc: chan of int, fd: ref Sys->FD, outc: chan of ref Vmsg, errorc: chan of int)
 {
-	pidc <-= pctl(0, nil);
+	pidc <-= sys->pctl(0, nil);
 	for(;;) {
 		vmsg := <- outc;
 		if(vmsg == nil)
@@ -847,24 +846,24 @@ kill(pid: int)
 {
 	cfd := sys->open(sprint("/prog/%d/ctl", pid), sys->OWRITE);
 	if(cfd != nil)
-		fprint(cfd, "kill");
+		sys->fprint(cfd, "kill");
 	verbose(sprint("killed pid %d", pid));
 }
 
 fail(s: string)
 {
-	fprint(fildes(2), "%s\n", s);
+	sys->fprint(sys->fildes(2), "%s\n", s);
 	raise "fail:"+s;
 }
 
 verbose(s: string)
 {
 	if(vflag)
-		fprint(fildes(2), "%s\n", s);
+		sys->fprint(sys->fildes(2), "%s\n", s);
 }
 
 debug(s: string)
 {
 	if(dflag)
-		fprint(fildes(2), "%s\n", s);
+		sys->fprint(sys->fildes(2), "%s\n", s);
 }

@@ -2,7 +2,7 @@ implement Venticopy;
 
 include "sys.m";
 	sys: Sys;
-	print, sprint, fprint, fildes: import sys;
+	sprint: import sys;
 include "draw.m";
 include "bufio.m";
 	bufio: Bufio;
@@ -59,13 +59,13 @@ init(nil: ref Draw->Context, args: list of string)
 	case tag {
 	"vac" =>	t = Roottype;
 	"entry" =>	t = Dirtype;
-	* =>	fprint(fildes(2), "bad score type\n");
+	* =>	sys->fprint(sys->fildes(2), "bad score type\n");
 		arg->usage();
 	}
 
 	(sok, score) := Score.parse(scorestr);
 	if(sok != 0)
-		error("bad score: "+scorestr);
+		fail("bad score: "+scorestr);
 	say("have score");
 
 	srcs = dial(srcaddr);
@@ -75,7 +75,7 @@ init(nil: ref Draw->Context, args: list of string)
 	say("have walk");
 
 	if(dsts.sync() < 0)
-		error(sprint("syncing destination: %r"));
+		fail(sprint("syncing destination: %r"));
 	say("synced");
 }
 
@@ -90,13 +90,13 @@ walk(s: Score, t, dt: int)
 
 	d := srcs.read(s, t, Venti->Maxlumpsize);
 	if(d == nil)
-		error(sprint("reading %s/%d: %r", s.text(), t));
+		fail(sprint("reading %s/%d: %r", s.text(), t));
 
 	case t {
 	Roottype =>
 		r := Root.unpack(d);
 		if(r == nil)
-			error(sprint("bad root: %r"));
+			fail(sprint("bad root: %r"));
 		walk(r.score, Dirtype, 0);
 		if(!isnul(*r.prev))
 			walk(*r.prev, Roottype, 0);
@@ -105,7 +105,7 @@ walk(s: Score, t, dt: int)
 		for(o := 0; o+Entrysize <= len d; o += Entrysize) {
 			e := Entry.unpack(d[o:o+Entrysize]);
 			if(e == nil)
-				error(sprint("bad entry: %r"));
+				fail(sprint("bad entry: %r"));
 			if(!(e.flags&Venti->Entryactive))
 				continue;
 			nt := Datatype;
@@ -132,14 +132,14 @@ walk(s: Score, t, dt: int)
 		;
 
 	* =>
-		error(sprint("unknown block type, %s/%d", s.text(), t));
+		fail(sprint("unknown block type, %s/%d", s.text(), t));
 	}
 	
 	(ok, ns) := dsts.write(t, d);
 	if(ok < 0)
-		error(sprint("writing %s/%d: %r", ns.text(), t));
+		fail(sprint("writing %s/%d: %r", ns.text(), t));
 	if(!ns.eq(s))
-		error(sprint("destination returned different score: %s versus %s", s.text(), ns.text()));
+		fail(sprint("destination returned different score: %s versus %s", s.text(), ns.text()));
 }
 
 isnul(s: Score): int
@@ -154,24 +154,24 @@ dial(addr: string): ref Session
 {
 	(cok, conn) := sys->dial(addr, nil);
 	if(cok < 0)
-		error(sprint("dialing %s: %r", addr));
+		fail(sprint("dialing %s: %r", addr));
 	say("have connection");
 
 	session = Session.new(conn.dfd);
 	if(session == nil)
-		error(sprint("handshake: %r"));
+		fail(sprint("handshake: %r"));
 	say("have handshake");
 	return session;
 }
 
-error(s: string)
+fail(s: string)
 {
-	fprint(fildes(2), "%s\n", s);
+	sys->fprint(sys->fildes(2), "%s\n", s);
 	raise "fail:"+s;
 }
 
 say(s: string)
 {
 	if(dflag)
-		fprint(fildes(2), "%s\n", s);
+		sys->fprint(sys->fildes(2), "%s\n", s);
 }

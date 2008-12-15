@@ -1,15 +1,13 @@
 implement Ventiread;
 
 include "sys.m";
+	sys: Sys;
+	sprint: import sys;
 include "draw.m";
 include "arg.m";
 include "venti.m";
-
-sys: Sys;
-venti: Venti;
-
-print, sprint, fprint, fildes: import sys;
-Score, Session: import venti;
+	venti: Venti;
+	Score, Session: import venti;
 
 Ventiread: module {
 	init:	fn(nil: ref Draw->Context, args: list of string);
@@ -58,17 +56,17 @@ init(nil: ref Draw->Context, args: list of string)
 	if(d == nil)
 		error(sprint("reading score: %r"));
 	say(sprint("have data, length %d", len d));
-	sys->write(fildes(1), d, len d);
+	sys->write(sys->fildes(1), d, len d);
 }
 
 error(s: string)
 {
-	fprint(fildes(2), "%s\n", s);
+	sys->fprint(sys->fildes(2), "%s\n", s);
 	raise "fail:"+s;
 }
 
 say(s: string)
 {
 	if(dflag)
-		fprint(fildes(2), "%s\n", s);
+		sys->fprint(sys->fildes(2), "%s\n", s);
 }

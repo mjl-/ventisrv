@@ -2,22 +2,20 @@ implement Ventiget;
 
 include "sys.m";
 	sys: Sys;
+	sprint: import sys;
 include "draw.m";
 include "bufio.m";
 	bufio: Bufio;
 	Iobuf: import bufio;
 include "arg.m";
 include "string.m";
+	str: String;
 include "venti.m";
+	venti: Venti;
+	Score, Session, Dirtype, Datatype: import venti;
 include "vac.m";
-
-str: String;
-venti: Venti;
-vac: Vac;
-
-print, sprint, fprint, fildes: import sys;
-Score, Session, Entrysize, Dirtype, Datatype: import venti;
-Vacfile, Entry: import vac;
+	vac: Vac;
+	Vacfile, Entry, Entrysize: import vac;
 
 Ventiget: module {
 	init:	fn(nil: ref Draw->Context, args: list of string);
@@ -34,9 +32,8 @@ init(nil: ref Draw->Context, args: list of string)
 	arg := load Arg Arg->PATH;
 	str = load String String->PATH;
 	venti = load Venti Venti->PATH;
-	vac = load Vac Vac->PATH;
-
 	venti->init();
+	vac = load Vac Vac->PATH;
 	vac->init();
 
 	arg->init(args);
@@ -57,35 +54,35 @@ init(nil: ref Draw->Context, args: list of string)
 	if(tag == nil)
 		tag = "entry";
 	if(tag != "entry")
-		error("bad score type: "+tag);
+		fail("bad score type: "+tag);
 
 	(sok, score) := Score.parse(scorestr);
 	if(sok != 0)
-		error("bad score: "+scorestr);
+		fail("bad score: "+scorestr);
 	say("have score");
 
 	(cok, conn) := sys->dial(addr, nil);
 	if(cok < 0)
-		error(sprint("dialing %s: %r", addr));
+		fail(sprint("dialing %s: %r", addr));
 	say("have connection");
 
 	fd := conn.dfd;
 	session = Session.new(fd);
 	if(session == nil)
-		error(sprint("handshake: %r"));
+		fail(sprint("handshake: %r"));
 	say("have handshake");
 
 	d := session.read(score, Dirtype, Entrysize);
 	if(d == nil)
-		error(sprint("reading entry: %r"));
+		fail(sprint("reading entry: %r"));
 	e := Entry.unpack(d);
 	if(e == nil)
-		error(sprint("unpacking entry: %r"));
+		fail(sprint("unpacking entry: %r"));
 	say("have entry");
 
-	bio := bufio->fopen(fildes(1), bufio->OWRITE);
+	bio := bufio->fopen(sys->fildes(1), bufio->OWRITE);
 	if(bio == nil)
-		error(sprint("bufio fopen: %r"));
+		fail(sprint("bufio fopen: %r"));
 
 	say("reading");
 	buf := array[sys->ATOMICIO] of byte;
@@ -95,26 +92,26 @@ init(nil: ref Draw->Context, args: list of string)
 		if(rn == 0)
 			break;
 		if(rn < 0)
-			error(sprint("reading: %r"));
+			fail(sprint("reading: %r"));
 		wn := bio.write(buf, rn);
 		if(wn != rn)
-			error(sprint("writing: %r"));
+			fail(sprint("writing: %r"));
 	}
 	bok := bio.flush();
 	bio.close();
 	if(bok == bufio->ERROR || bok == bufio->EOF)
-		error(sprint("bufio close: %r"));
+		fail(sprint("bufio close: %r"));
 	say("done");
 }
 
-error(s: string)
+fail(s: string)
 {
-	fprint(fildes(2), "%s\n", s);
+	sys->fprint(sys->fildes(2), "%s\n", s);
 	raise "fail:"+s;
 }
 
 say(s: string)
 {
 	if(dflag)
-		fprint(fildes(2), "%s\n", s);
+		sys->fprint(sys->fildes(2), "%s\n", s);
 }

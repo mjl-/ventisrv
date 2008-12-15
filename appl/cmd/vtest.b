@@ -1,15 +1,13 @@
 implement Vtest;
 
 include "sys.m";
+	sys: Sys;
+	sprint: import sys;
 include "draw.m";
 include "arg.m";
 include "venti.m";
-
-sys: Sys;
-venti: Venti;
-
-print, sprint, fprint, fildes: import sys;
-Vmsg, Score, Session, Datatype: import venti;
+	venti: Venti;
+	Vmsg, Score, Session, Datatype: import venti;
 
 Vtest: module {
 	init:	fn(nil: ref Draw->Context, args: list of string);
@@ -44,43 +42,43 @@ init(nil: ref Draw->Context, args: list of string)
 	args = tl args;
 	(ok, score) := Score.parse(hd args);
 	if(ok != 0)
-		error("bad score: "+hd args);
+		fail("bad score: "+hd args);
 
 	say("dialing");
 	(cok, conn) := sys->dial(addr, nil);
 	if(cok < 0)
-		error(sprint("dialing %s: %r", addr));
+		fail(sprint("dialing %s: %r", addr));
 	fd := conn.dfd;
 	say("have connection");
 
 	session := Session.new(fd);
 	if(session == nil)
-		error(sprint("handshake: %r"));
+		fail(sprint("handshake: %r"));
 	say("have handshake");
 
 	for(i := 0; i < n; i++) {
 		vmsg := ref Vmsg.Tread(1, i % 256, score, dtype, Venti->Maxlumpsize);
 		d := vmsg.pack();
 		if(sys->write(fd, d, len d) != len d)
-			error(sprint("writing: %r"));
+			fail(sprint("writing: %r"));
 		say(sprint("> %d", tagof vmsg));
 	}
 	for(i = 0; i < n; i++) {
 		(vmsg, err) := Vmsg.read(fd);
 		if(err != nil)
-			error(sprint("reading: %r"));
+			fail(sprint("reading: %r"));
 		say(sprint("< %d", tagof vmsg));
 	}
 }
 
-error(s: string)
+fail(s: string)
 {
-	fprint(fildes(2), "%s\n", s);
+	sys->fprint(sys->fildes(2), "%s\n", s);
 	raise "fail:"+s;
 }
 
 say(s: string)
 {
 	if(dflag)
-		fprint(fildes(2), "%s\n", s);
+		sys->fprint(sys->fildes(2), "%s\n", s);
 }

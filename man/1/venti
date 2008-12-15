@@ -150,9 +150,6 @@ Use blocks with
 bytes instead of the default 8192 byte blocks.  Only for
 .IR venti/put .
 .TP
-.B -r
-Use Rabin fingerprinting to determine block bounderies.
-.TP
 .BI -n " count"
 Send
 .I count

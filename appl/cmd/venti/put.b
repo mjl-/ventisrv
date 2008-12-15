@@ -2,20 +2,18 @@ implement Ventiput;
 
 include "sys.m";
 	sys: Sys;
+	sprint: import sys;
 include "draw.m";
 include "bufio.m";
 	bufio: Bufio;
 	Iobuf: import bufio;
 include "arg.m";
 include "venti.m";
+	venti: Venti;
+	Score, Session, Dirtype, Datatype: import venti;
 include "vac.m";
-
-venti: Venti;
-vac: Vac;
-
-print, sprint, fprint, fildes: import sys;
-Score, Session, Dirtype, Datatype: import venti;
-File, Entry: import vac;
+	vac: Vac;
+	File, Entry: import vac;
 
 Ventiput: module {
 	init:	fn(nil: ref Draw->Context, args: list of string);
@@ -32,9 +30,8 @@ init(nil: ref Draw->Context, args: list of string)
 	bufio = load Bufio Bufio->PATH;
 	arg := load Arg Arg->PATH;
 	venti = load Venti Venti->PATH;
-	vac = load Vac Vac->PATH;
-
 	venti->init();
+	vac = load Vac Vac->PATH;
 	vac->init();
 
 	arg->init(args);
@@ -60,7 +57,7 @@ init(nil: ref Draw->Context, args: list of string)
 		error(sprint("handshake: %r"));
 	say("have handshake");
 
-	bio := bufio->fopen(fildes(0), bufio->OREAD);
+	bio := bufio->fopen(sys->fildes(0), bufio->OREAD);
 	if(bio == nil)
 		error(sprint("bufio open: %r"));
 
@@ -95,7 +92,7 @@ init(nil: ref Draw->Context, args: list of string)
 	if(rok < 0)
 		error(sprint("writing root score: %r"));
 	say("entry written, "+rscore.text());
-	print("entry:%s\n", rscore.text());
+	sys->print("entry:%s\n", rscore.text());
 
 	if(session.sync() < 0)
 		error(sprint("syncing server: %r"));
@@ -103,12 +100,12 @@ init(nil: ref Draw->Context, args: list of string)
 
 error(s: string)
 {
-	fprint(fildes(2), "%s\n", s);
+	sys->fprint(sys->fildes(2), "%s\n", s);
 	raise "fail:"+s;
 }
 
 say(s: string)
 {
 	if(dflag)
-		fprint(fildes(2), "%s\n", s);
+		sys->fprint(sys->fildes(2), "%s\n", s);
 }

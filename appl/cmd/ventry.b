@@ -1,21 +1,19 @@
 implement Ventry;
 
 include "sys.m";
+	sys: Sys;
+	sprint: import sys;
 include "draw.m";
 include "arg.m";
 include "bufio.m";
 	bufio: Bufio;
 	Iobuf: import bufio;
 include "venti.m";
+	venti: Venti;
+	Score, Session, Entrysize, Datatype, Dirtype: import venti;
 include "vac.m";
-
-sys: Sys;
-venti: Venti;
-vac: Vac;
-
-print, sprint, fprint, fildes: import sys;
-Score, Session, Entrysize, Datatype, Dirtype: import venti;
-Entry, Vacfile: import vac;
+	vac: Vac;
+	Entry, Vacfile: import vac;
 
 Ventry: module {
 	init:	fn(nil: ref Draw->Context, args: list of string);
@@ -30,9 +28,8 @@ init(nil: ref Draw->Context, args: list of string)
 	arg := load Arg Arg->PATH;
 	bufio = load Bufio Bufio->PATH;
 	venti = load Venti Venti->PATH;
-	vac = load Vac Vac->PATH;
-
 	venti->init();
+	vac = load Vac Vac->PATH;
 	vac->init();
 
 	index := 0;
@@ -51,59 +48,59 @@ init(nil: ref Draw->Context, args: list of string)
 
 	(ok, score) := Score.parse(hd args);
 	if(ok != 0)
-		error("bad score: "+hd args);
+		fail("bad score: "+hd args);
 
 	say("dialing");
 	(cok, conn) := sys->dial(addr, nil);
 	if(cok < 0)
-		error(sprint("dialing %s: %r", addr));
+		fail(sprint("dialing %s: %r", addr));
 	fd := conn.dfd;
 	say("have connection");
 
 	session := Session.new(fd);
 	if(session == nil)
-		error(sprint("handshake: %r"));
+		fail(sprint("handshake: %r"));
 	say("have handshake");
 
 	ed := session.read(score, Dirtype, venti->Maxlumpsize);
 	if(ed == nil)
-		error(sprint("reading entry: %r"));
+		fail(sprint("reading entry: %r"));
 	o := (index+1)*Entrysize;
 	if(o > len ed)
-		error(sprint("only %d entries present", len ed/Entrysize));
+		fail(sprint("only %d entries present", len ed/Entrysize));
 	e := Entry.unpack(ed[o-Entrysize:o]);
 	if(e == nil)
-		error(sprint("parsing entry: %r"));
+		fail(sprint("parsing entry: %r"));
 	say("entry unpacked");
 
-	bio := bufio->fopen(fildes(1), bufio->OWRITE);
+	bio := bufio->fopen(sys->fildes(1), bufio->OWRITE);
 	if(bio == nil)
-		error(sprint("fopen stdout: %r"));
+		fail(sprint("fopen stdout: %r"));
 
 	f := Vacfile.new(session, e);
 	buf := array[e.dsize] of byte;
 	for(;;) {
 		n := f.read(buf, len buf);
 		if(n < 0)
-			error(sprint("reading: %r"));
+			fail(sprint("reading: %r"));
 		if(n == 0)
 			break;
 		say(sprint("have %d", n));
 		if(bio.write(buf, n) != n)
-			error(sprint("writing: %r"));
+			fail(sprint("writing: %r"));
 	}
 	if(bio.flush() < 0)
-		error(sprint("closing: %r"));
+		fail(sprint("closing: %r"));
 }
 
-error(s: string)
+fail(s: string)
 {
-	fprint(fildes(2), "%s\n", s);
+	sys->fprint(sys->fildes(2), "%s\n", s);
 	raise "fail:"+s;
 }
 
 say(s: string)
 {
 	if(dflag)
-		fprint(fildes(2), "%s\n", s);
+		sys->fprint(sys->fildes(2), "%s\n", s);
 }

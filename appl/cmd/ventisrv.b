@@ -31,26 +31,24 @@
 implement Ventisrv;
 
 include "sys.m";
+	sys: Sys;
+	sprint: import sys;
 include "draw.m";
 include "arg.m";
 include "daytime.m";
+	daytime: Daytime;
 include "string.m";
+	str: String;
 include "keyring.m";
+	kr: Keyring;
 include "filter.m";
+	deflate, inflate: Filter;
 include "lock.m";
+	lock: Lock;
+	Semaphore: import lock;
 include "venti.m";
-
-sys: Sys;
-daytime: Daytime;
-str: String;
-keyring: Keyring;
-venti: Venti;
-deflate, inflate: Filter;
-lock: Lock;
-
-sprint, fprint, print, fildes: import sys;
-Score, Scoresize, Vmsg: import venti;
-Semaphore: import lock;
+	venti: Venti;
+	Score, Scoresize, Vmsg: import venti;
 
 
 Ventisrv: module {
@@ -238,7 +236,7 @@ init(nil: ref Draw->Context, args: list of string)
 	arg := load Arg Arg->PATH;
 	daytime = load Daytime Daytime->PATH;
 	str = load String String->PATH;
-	keyring = load Keyring Keyring->PATH;
+	kr = load Keyring Keyring->PATH;
 	lock = load Lock Lock->PATH;
 	lock->init();
 	deflate = load Filter Filter->DEFLATEPATH;
@@ -264,13 +262,13 @@ init(nil: ref Draw->Context, args: list of string)
 		'v' =>	verbose++;
 		's' =>	(statsdir, statsfile) = str->splitstrr(arg->earg(), "/");
 			if(statsfile == nil) {
-				fprint(fildes(2), "bad stats file");
+				sys->fprint(sys->fildes(2), "bad stats file");
 				arg->usage();
 			}
 		'r' =>	raddrs = arg->earg()::raddrs;
 		'w' =>	waddrs = arg->earg()::waddrs;
 		* =>
-			fprint(fildes(2), "bad option: -%c\n", c);
+			sys->fprint(sys->fildes(2), "bad option: -%c\n", c);
 			arg->usage();
 		}
 
@@ -1125,7 +1123,7 @@ readline(fd: ref Sys->FD): array of byte
 
 handshake(fd: ref Sys->FD): string
 {
-	if(fprint(fd, "venti-02-ventisrv\n") < 0)
+	if(sys->fprint(fd, "venti-02-ventisrv\n") < 0)
 		return sprint("writing version: %r");
 
 	d := readline(fd);
@@ -1551,8 +1549,8 @@ Chain.mk(): ref Chain
 
 sha1(a: array of byte): array of byte
 {
-	r := array[keyring->SHA1dlen] of byte;
-	keyring->sha1(a, len a, r, nil);
+	r := array[kr->SHA1dlen] of byte;
+	kr->sha1(a, len a, r, nil);
 	return r;
 }
 
@@ -1925,11 +1923,11 @@ log2(v: big): int
 
 fail(s: string)
 {
-	fprint(fildes(2), "%s\n", s);
+	sys->fprint(sys->fildes(2), "%s\n", s);
 	raise "fail:"+s;
 }
 
 say(s: string)
 {
-	fprint(fildes(2), "%s\n", s);
+	sys->fprint(sys->fildes(2), "%s\n", s);
 }

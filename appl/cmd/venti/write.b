@@ -1,15 +1,13 @@
 implement Ventiwrite;
 
 include "sys.m";
+	sys: Sys;
+	sprint: import sys;
 include "draw.m";
 include "arg.m";
 include "venti.m";
-
-sys: Sys;
-venti: Venti;
-
-print, sprint, fprint, fildes: import sys;
-Score, Session: import venti;
+	venti: Venti;
+	Score, Session: import venti;
 
 Ventiwrite: module {
 	init:	fn(nil: ref Draw->Context, args: list of string);
@@ -42,27 +40,27 @@ init(nil: ref Draw->Context, args: list of string)
 	say("dialing");
 	(cok, conn) := sys->dial(addr, nil);
 	if(cok < 0)
-		error(sprint("dialing %s: %r", addr));
+		fail(sprint("dialing %s: %r", addr));
 	fd := conn.dfd;
 	say("have connection");
 
 	session := Session.new(fd);
 	if(session == nil)
-		error(sprint("handshake: %r"));
+		fail(sprint("handshake: %r"));
 	say("have handshake");
 
 	d := read();
 	say(sprint("have data, length %d", len d));
 	if(len d > Venti->Maxlumpsize)
-		error(sprint("data (%d bytes) exceeds maximum lumpsize (%d bytes)", len d, Venti->Maxlumpsize));
+		fail(sprint("data (%d bytes) exceeds maximum lumpsize (%d bytes)", len d, Venti->Maxlumpsize));
 
 	(ok, score) := session.write(vtype, d);
 	if(ok < 0)
-		error(sprint("writing data: %r"));
+		fail(sprint("writing data: %r"));
 	say(sprint("wrote data to venti, length %d", len d));
-	print("venti/read %d %s\n", vtype, score.text());
+	sys->print("venti/read %d %s\n", vtype, score.text());
 	if(session.sync() < 0)
-		error(sprint("syncing server: %r"));
+		fail(sprint("syncing server: %r"));
 }
 
 read(): array of byte
@@ -74,7 +72,7 @@ read(): array of byte
 		if(n == 0)
 			break;
 		if(n < 0)
-			error(sprint("reading data: %r"));
+			fail(sprint("reading data: %r"));
 		newd := array[len d+n] of byte;
 		newd[:] = d;
 		newd[len d:] = buf[:n];
@@ -83,14 +81,14 @@ read(): array of byte
 	return d;
 }
 
-error(s: string)
+fail(s: string)
 {
-	fprint(fildes(2), "%s\n", s);
+	sys->fprint(sys->fildes(2), "%s\n", s);
 	raise "fail:"+s;
 }
 
 say(s: string)
 {
 	if(dflag)
-		fprint(fildes(2), "%s\n", s);
+		sys->fprint(sys->fildes(2), "%s\n", s);
 }

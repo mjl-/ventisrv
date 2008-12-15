@@ -1,20 +1,18 @@
 implement Ventiparse;
 
 include "sys.m";
+	sys: Sys;
+	sprint: import sys;
 include "draw.m";
 include "string.m";
+	str: String;
 include "arg.m";
 include "venti.m";
+	venti: Venti;
+	Score, Scoresize, Entrydir, Dirtype, Datatype, Pointertype0: import venti;
 include "vac.m";
-
-sys: Sys;
-str: String;
-venti: Venti;
-vac: Vac;
-
-fprint, sprint, print, fildes: import sys;
-Score, Scoresize, Entrysize, Entrydir, Dirtype, Datatype, Pointertype0: import venti;
-Root, Entry, Direntry, Metablock, Metaentry, Metablocksize, Metaentrysize: import vac;
+	vac: Vac;
+	Root, Entry, Entrysize, Direntry, Metablock, Metaentry, Metablocksize, Metaentrysize: import vac;
 
 Direntrymagic:  con 16r1c4d9072;
 Metablockmagic: con 16r5656fc79;
@@ -29,9 +27,8 @@ init(nil: ref Draw->Context, args: list of string)
 	arg := load Arg Arg->PATH;
 	str = load String String->PATH;
 	venti = load Venti Venti->PATH;
-	vac = load Vac Vac->PATH;
-
 	venti->init();
+	vac = load Vac Vac->PATH;
 	vac->init();
 
 	arg->init(args);
@@ -52,7 +49,7 @@ init(nil: ref Draw->Context, args: list of string)
 	if(dtype == nil)
 		dtype = guesstype(d);
 	if(dtype == nil)
-		error("could not guess type");
+		fail("could not guess type");
 
 	case str->tolower(dtype) {
 	"vac" or "root" =>
@@ -72,7 +69,7 @@ init(nil: ref Draw->Context, args: list of string)
 	"rpointers" =>
 		rpointers(d);
 	* =>
-		fprint(fildes(2), "bad type: %s\n", hd args);
+		sys->fprint(sys->fildes(2), "bad type: %s\n", hd args);
 		arg->usage();
 	}
 }
@@ -127,7 +124,7 @@ read(): array of byte
 		if(n == 0)
 			break;
 		if(n < 0)
-			error(sprint("reading data: %r"));
+			fail(sprint("reading data: %r"));
 		newd := array[len d+n] of byte;
 		newd[:] = d;
 		newd[len d:] = buf[:n];
@@ -140,52 +137,52 @@ root(d: array of byte)
 {
 	r := Root.unpack(d);
 	if(r == nil)
-		error(sprint("unpacking root: %r"));
+		fail(sprint("unpacking root: %r"));
 	printroot(r);
 }
 
 printroot(r: ref Root)
 {
-	print("Root:\n");
-	print("\tversion=%d\n", r.version);
-	print("\tname=%s\n", r.name);
-	print("\trtype=%s\n", r.rtype);
-	print("\tscore=%s\n", r.score.text());
-	print("\tblocksize=%d\n", r.blocksize);
-	print("\tprev=%s\n", (*r.prev).text());
-	print("venti/read %d %s | venti/parse entries\n", Dirtype, r.score.text());
+	sys->print("Root:\n");
+	sys->print("\tversion=%d\n", r.version);
+	sys->print("\tname=%s\n", r.name);
+	sys->print("\trtype=%s\n", r.rtype);
+	sys->print("\tscore=%s\n", r.score.text());
+	sys->print("\tblocksize=%d\n", r.blocksize);
+	sys->print("\tprev=%s\n", (*r.prev).text());
+	sys->print("venti/read %d %s | venti/parse entries\n", Dirtype, r.score.text());
 }
 
 entry(d: array of byte)
 {
 	e := Entry.unpack(d);
 	if(e == nil)
-		error(sprint("unpacking entry: %r"));
+		fail(sprint("unpacking entry: %r"));
 	printentry(e);
 }
 
 entries(d: array of byte)
 {
 	if(len d % Entrysize != 0)
-		error(sprint("data (%d bytes) not multiple of Entrysize (%d bytes)", len d, Entrysize));
+		fail(sprint("data (%d bytes) not multiple of Entrysize (%d bytes)", len d, Entrysize));
 	for(i := 0; i+Entrysize <= len d; i += Entrysize)
 		entry(d[i:i+Entrysize]);
 }
 
 printentry(e: ref Entry)
 {
-	print("Entry:\n");
-	print("\tgen=%d\n", e.gen);
-	print("\tpsize=%d\n", e.psize);
-	print("\tdsize=%d\n", e.dsize);
-	print("\tflags=%d\n", e.flags);
-	print("\tdepth=%d\n", e.depth);
-	print("\tsize=%bd\n", e.size);
-	print("\tscore=%s\n", e.score.text());
+	sys->print("Entry:\n");
+	sys->print("\tgen=%d\n", e.gen);
+	sys->print("\tpsize=%d\n", e.psize);
+	sys->print("\tdsize=%d\n", e.dsize);
+	sys->print("\tflags=%d\n", e.flags);
+	sys->print("\tdepth=%d\n", e.depth);
+	sys->print("\tsize=%bd\n", e.size);
+	sys->print("\tscore=%s\n", e.score.text());
 	if(e.depth > 0) {
 		which := "pointers";
 		dtype := Pointertype0+e.depth-1;
-		print("venti/read %d %s | venti/parse %s\n", dtype, e.score.text(), which);
+		sys->print("venti/read %d %s | venti/parse %s\n", dtype, e.score.text(), which);
 	} else {
 		dtype := Datatype;
 		pipe := "";
@@ -193,7 +190,7 @@ printentry(e: ref Entry)
 			dtype = Dirtype;
 			pipe = " | venti/parse entries";
 		}
-		print("venti/read %d %s%s\n", dtype, e.score.text(), pipe);
+		sys->print("venti/read %d %s%s\n", dtype, e.score.text(), pipe);
 	}
 }
 
@@ -201,35 +198,35 @@ direntry(d: array of byte)
 {
 	de := Direntry.unpack(d);
 	if(de == nil)
-		error(sprint("unpacking direntry: %r"));
+		fail(sprint("unpacking direntry: %r"));
 	printdirentry(de);
 }
 
 printdirentry(de: ref Direntry)
 {
-	print("Direntry:\n");
-	print("\tversion=%d\n", de.version);
-	print("\telem=%s\n", de.elem);
-	print("\tentry=%d\n", de.entry);
-	print("\tgen=%d\n", de.gen);
-	print("\tmentry=%d\n", de.mentry);
-	print("\tmgen=%d\n", de.mgen);
-	print("\tqid=%bd\n", de.qid);
-	print("\tuid=%s\n", de.uid);
-	print("\tgid=%s\n", de.gid);
-	print("\tmid=%s\n", de.mid);
-	print("\tmtime=%d\n", de.mtime);
-	print("\tmcount=%d\n", de.mcount);
-	print("\tctime=%d\n", de.ctime);
-	print("\tatime=%d\n", de.atime);
-	print("\tmode=%x\n", de.mode);
+	sys->print("Direntry:\n");
+	sys->print("\tversion=%d\n", de.version);
+	sys->print("\telem=%s\n", de.elem);
+	sys->print("\tentry=%d\n", de.entry);
+	sys->print("\tgen=%d\n", de.gen);
+	sys->print("\tmentry=%d\n", de.mentry);
+	sys->print("\tmgen=%d\n", de.mgen);
+	sys->print("\tqid=%bd\n", de.qid);
+	sys->print("\tuid=%s\n", de.uid);
+	sys->print("\tgid=%s\n", de.gid);
+	sys->print("\tmid=%s\n", de.mid);
+	sys->print("\tmtime=%d\n", de.mtime);
+	sys->print("\tmcount=%d\n", de.mcount);
+	sys->print("\tctime=%d\n", de.ctime);
+	sys->print("\tatime=%d\n", de.atime);
+	sys->print("\tmode=%x\n", de.mode);
 }
 
 metablock(d: array of byte)
 {
 	mb := Metablock.unpack(d);
 	if(mb == nil)
-		error(sprint("unpacking metablock: %r"));
+		fail(sprint("unpacking metablock: %r"));
 	printmetablock(mb, d, 0);
 }
 
@@ -239,7 +236,7 @@ metablocks(d: array of byte)
 	while(i < len d) {
 		mb := Metablock.unpack(d[i:]);
 		if(mb == nil)
-			error(sprint("unpacking metablock: %r"));
+			fail(sprint("unpacking metablock: %r"));
 		printmetablock(mb, d[i:], 1);
 		i += Vac->Dsize;
 	}
@@ -247,18 +244,18 @@ metablocks(d: array of byte)
 
 printmetablock(mb: ref Metablock, d: array of byte, printde: int)
 {
-	print("Metablock:\n");
-	print("\tsize=%d\n", mb.size);
-	print("\tfree=%d\n", mb.free);
-	print("\tmaxindex=%d\n", mb.maxindex);
-	print("\tnindex=%d\n", mb.nindex);
+	sys->print("Metablock:\n");
+	sys->print("\tsize=%d\n", mb.size);
+	sys->print("\tfree=%d\n", mb.free);
+	sys->print("\tmaxindex=%d\n", mb.maxindex);
+	sys->print("\tnindex=%d\n", mb.nindex);
 
-	print("Meta entries:\n");
+	sys->print("Meta entries:\n");
 	for(i := 0; i < mb.nindex; i++) {
 		me := Metaentry.unpack(d, i);
 		if(me == nil)
-			error(sprint("parsing meta entry: %r"));
-		print("\toffset=%d size=%d\n", me.offset, me.size);
+			fail(sprint("parsing meta entry: %r"));
+		sys->print("\toffset=%d size=%d\n", me.offset, me.size);
 	}
 
 	if(!printde)
@@ -267,10 +264,10 @@ printmetablock(mb: ref Metablock, d: array of byte, printde: int)
 	for(i = 0; i < mb.nindex; i++) {
 		me := Metaentry.unpack(d, i);
 		if(me == nil)
-			error(sprint("parsing meta entry: %r"));
+			fail(sprint("parsing meta entry: %r"));
 		de := Direntry.unpack(d[me.offset:me.offset+me.size]);
 		if(de == nil)
-			error(sprint("parsing direntry: %r"));
+			fail(sprint("parsing direntry: %r"));
 		printdirentry(de);
 	}
 }
@@ -278,31 +275,39 @@ printmetablock(mb: ref Metablock, d: array of byte, printde: int)
 pointers(d: array of byte)
 {
 	if(len d % Scoresize != 0)
-		error(sprint("data not multiple of scoresize: %d", len d));
-	print("Pointers:\n");
+		fail(sprint("data not multiple of scoresize: %d", len d));
+	sys->print("Pointers:\n");
 	for(o := Scoresize; o <= len d; o += Scoresize)
-		print("\t%s\n", Score(d[o-Scoresize:o]).text());
+		sys->print("\t%s\n", Score(d[o-Scoresize:o]).text());
 }
 
 rpointers(d: array of byte)
 {
 	esize := Scoresize+8;
 	if(len d % esize != 0)
-		error(sprint("data not multiple of scoresize+8: %d", len d));
-	print("Rpointers:\n");
+		fail(sprint("data not multiple of scoresize+8: %d", len d));
+	sys->print("Rpointers:\n");
 	for(o := 0; o+esize <= len d; o += esize)
-		print("\tlength=%10bd %s\n", g64(d, o+Scoresize), Score(d[o:o+Scoresize]).text());
+		sys->print("\tlength=%10bd %s\n", g64(d, o+Scoresize), Score(d[o:o+Scoresize]).text());
 }
 
-g64(f: array of byte, i: int): big
+g64(d: array of byte, i: int): big
 {
-	b0 := (((((int f[i+0] << 8) | int f[i+1]) << 8) | int f[i+2]) << 8) | int f[i+3];
-	b1 := (((((int f[i+4] << 8) | int f[i+5]) << 8) | int f[i+6]) << 8) | int f[i+7];
-	return (big b0 << 32) | (big b1 & 16rFFFFFFFF);
+	o := i;
+	v := big 0;
+	v |= big (d[o++]<<56);
+	v |= big (d[o++]<<48);
+	v |= big (d[o++]<<40);
+	v |= big (d[o++]<<32);
+	v |= big (d[o++]<<24);
+	v |= big (d[o++]<<16);
+	v |= big (d[o++]<<8);
+	v |= big (d[o++]<<0);
+	return v;
 }
 
-error(s: string)
+fail(s: string)
 {
-	fprint(fildes(2), "%s\n", s);
+	sys->fprint(sys->fildes(2), "%s\n", s);
 	raise "fail:"+s;
 }

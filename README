@@ -45,6 +45,4 @@ mechiel@xs4all.nl or mechiel@ueber.net.
 # todo
 
 - remove compression from ventisrv.
-- update manual pages for rabin removal.
-- cleanup the code with my updated ideas on programming style.
 - test ventisrv & vcache.

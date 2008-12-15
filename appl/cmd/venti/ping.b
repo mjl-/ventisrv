@@ -1,15 +1,13 @@
 implement Ventiping;
 
 include "sys.m";
+	sys: Sys;
+	sprint: import sys;
 include "draw.m";
 include "arg.m";
 include "venti.m";
-
-sys: Sys;
-venti: Venti;
-
-print, sprint, fprint, fildes: import sys;
-Score, Session, Vmsg: import venti;
+	venti: Venti;
+	Score, Session, Vmsg: import venti;
 
 Ventiping: module {
 	init:	fn(nil: ref Draw->Context, args: list of string);
@@ -59,7 +57,7 @@ init(nil: ref Draw->Context, args: list of string)
 		if(rm == nil)
 			fail("ping: "+err);
 		t1 := sys->millisec();
-		print("%d ms\n", t1-t0);
+		sys->print("%d ms\n", t1-t0);
 		i++;
 		if(i == n)
 			break;
@@ -69,12 +67,12 @@ init(nil: ref Draw->Context, args: list of string)
 
 fail(s: string)
 {
-	fprint(fildes(2), "%s\n", s);
+	sys->fprint(sys->fildes(2), "%s\n", s);
 	raise "fail:"+s;
 }
 
 say(s: string)
 {
 	if(dflag)
-		fprint(fildes(2), "%s\n", s);
+		sys->fprint(sys->fildes(2), "%s\n", s);
 }

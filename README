@@ -44,5 +44,6 @@ mechiel@xs4all.nl or mechiel@ueber.net.
 
 # todo
 
-- remove compression from ventisrv.
-- test ventisrv & vcache.
+- use different compression algorithm in ventisrv.  one that is
+  faster (perhaps with c implementation).
+- test ventisrv & vcache more.

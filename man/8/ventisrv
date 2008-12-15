@@ -78,7 +78,7 @@ File to use as data file.  Default is
 .BI -s " statsfile"
 File to serve statistics on.  Default is
 .IR /chan/ventisrvstats .
-Each line starts with a space-padded 14 byte number followed by a space and a textual description.  The last line is empty unless a write error has occurred, in which it contains the error message.
+Each line starts with a space-padded 14 byte number followed by a space and a textual description.  The last line is empty unless a write error has occurred, in which case it contains the error message.
 .TP
 .B -D
 Print (lots of) debug messages.  Prints multiple lines per venti transaction.

@@ -1,0 +1,50 @@
+# status
+
+should be usable, but note that especially ventisrv is subject to
+a big cleanup.  other code & man pages too though.
+
+
+# intro
+
+ventisrv is a venti daemon for inferno, written in limbo.  it has
+an in-memory index.  vcache is a (in-memory) venti cache.  this
+package also contains simple tools to write to/read from a venti
+server.
+
+this code is the partial result of a (successful) google summer of
+code 2007 project, for the project "plan 9/inferno", subproject
+"ventivac".
+
+
+# download
+
+see the ventisrv homepage at http://www.ueber.net/code/r/ventisrv
+for the latest version.
+
+
+# install
+
+to install, first make a file "mkconfig" similar to your inferno's
+installation mkconfig (symlink/bind it).  now type "mk" to compile.
+create directory "/dis/venti" and "mk install" to install.
+
+
+# documentation
+
+see the manual pages.
+
+
+# licence & author
+
+this code is released under the well-known MIT-license (the recommended
+licence for participants of the "plan 9/inferno" google summer of
+code 2007.  the code is written by mechiel lukkien, reachable at
+mechiel@xs4all.nl or mechiel@ueber.net.
+
+
+# todo
+
+- remove compression from ventisrv.
+- update manual pages for rabin removal.
+- cleanup the code with my updated ideas on programming style.
+- test ventisrv & vcache.

@@ -18,15 +18,18 @@ code 2007 project, for the project "plan 9/inferno", subproject
 
 # download
 
-see the ventisrv homepage at http://www.ueber.net/code/r/ventisrv
-for the latest version.
+the latest version can be found at:
+
+	http://www.ueber.net/code/r/ventisrv
 
 
 # install
 
-to install, first make a file "mkconfig" similar to your inferno's
-installation mkconfig (symlink/bind it).  now type "mk" to compile.
-create directory "/dis/venti" and "mk install" to install.
+change mkconfig if you do not have $ROOT set.  run "mk" to compile.
+create directory "/dis/venti" and run "mk install" to install.
+
+when building from within inferno, insert SYSHOST=Inferno and ROOT=
+in the mk invocations to override the values in the mkconfig.
 
 
 # documentation
@@ -36,10 +39,8 @@ see the manual pages.
 
 # licence & author
 
-this code is released under the well-known MIT-license (the recommended
-licence for participants of the "plan 9/inferno" google summer of
-code 2007.  the code is written by mechiel lukkien, reachable at
-mechiel@xs4all.nl or mechiel@ueber.net.
+all files are in the public domain.  this code has been written by
+mechiel lukkien, reachable at mechiel@ueber.net or mechiel@xs4all.nl.
 
 
 # todo

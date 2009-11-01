@@ -1121,6 +1121,19 @@ readline(fd: ref Sys->FD): array of byte
 	return nil;
 }
 
+compatible(s: string): int
+{
+	if(!str->prefix("venti-", s))
+		return 0;
+	(s, nil) = str->splitstrr(s[len "venti-":], "-");
+	if(s == nil)
+		return 0;
+	for(l := sys->tokenize(s[:len s-1], ":").t1; l != nil; l = tl l)
+		if(hd l == "02")
+			return 1;
+	return 0;
+}
+
 handshake(fd: ref Sys->FD): string
 {
 	if(sys->fprint(fd, "venti-02-ventisrv\n") < 0)
@@ -1129,8 +1142,8 @@ handshake(fd: ref Sys->FD): string
 	d := readline(fd);
 	if(d == nil)
 		return sprint("bad version (%r)");
-	if(!str->prefix("venti-02-", string d))
-		return sprint("bad version (%s)", string d);
+	if(!compatible(vers := string d))
+		return sprint("bad version (%s)", vers);
 
 	(tvmsg, terr) := Vmsg.read(fd);
 	if(terr != nil)

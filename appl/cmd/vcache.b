@@ -9,6 +9,8 @@ include "sys.m";
 	sprint: import sys;
 include "draw.m";
 include "arg.m";
+include "dial.m";
+	dial: Dial;
 include "string.m";
 	str: String;
 include "keyring.m";
@@ -17,38 +19,45 @@ include "venti.m";
 	venti: Venti;
 	Score, Session, Vmsg: import venti;
 
-
 Vcache: module {
 	init:	fn(nil: ref Draw->Context, args: list of string);
 };
 
 Eperm:	con "permission denied";
 
-laddr := "net!*!venti";
+laddr := "*";
 statsdir := "/chan/";
 statsfile := "vcachestats";
-dflag := nflag := vflag := wflag := 0;
+dflag,
+nflag,
+vflag,
+wflag: int;
 
-maxcachesize := 0;
-remoteaddr, proxyaddr: string;
+maxcachesize: int;
+remoteaddr: string;
+proxyaddr: string;
 clients: list of ref Client;
-remote, proxy: ref Conn;
+remote: ref Conn;
+proxy: ref Conn;
 
 wrotec: chan of (int, int);
 registerc: chan of (int, int, chan of ref Vmsg);
 requestc: chan of (ref Vmsg, int);
 
-proxymiss, proxyreq: int;
-remotereads, remotewrites: int;
-
+proxymiss: int;
+proxyreq: int;
+remotereads: int;
+remotewrites: int;
 
 Block: adt {
-	s:	Score;
-	dtype:	int;
-	d:	array of byte;
-	used:	byte;
-	lookprev, looknext:	cyclic ref Block;
-	takeprev, takenext:	cyclic ref Block;
+	s:		Score;
+	dtype:		int;
+	d:		array of byte;
+	used:		byte;
+	lookprev,
+	looknext:	cyclic ref Block;
+	takeprev,
+	takenext:	cyclic ref Block;
 };
 Arraysize:	con 4+4+4;
 Refsize:	con 4;
@@ -57,15 +66,16 @@ Dataavgsize:	con 8*1024+Blocksize;	# 8kb blocks are not really average...
 Blocksperhead:	con 32;
 		
 take: ref Block;
-cacheused := 0;
-cachemiss, cachereq: int;
+cacheused: int;
+cachemiss: int;
+cachereq: int;
 cacheheads: array of ref Block;
-
 
 init(nil: ref Draw->Context, args: list of string)
 {
 	sys = load Sys Sys->PATH;
 	arg := load Arg Arg->PATH;
+	dial = load Dial Dial->PATH;
 	str = load String String->PATH;
 	kr = load Keyring Keyring->PATH;
 	venti = load Venti Venti->PATH;
@@ -81,28 +91,28 @@ init(nil: ref Draw->Context, args: list of string)
 		's' =>	maxcachesize = int arg->earg();
 		'S' =>	(statsdir, statsfile) = str->splitstrr(arg->earg(), "/");
 			if(statsfile == nil) {
-				sys->fprint(sys->fildes(2), "bad statsfile\n");
+				warn("bad statsfile");
 				arg->usage();
 			}
 		'v' =>	vflag++;
 		'w' =>	wflag = 1;
-		* =>	sys->fprint(sys->fildes(2), "bad option: -%c\n", c);
-			arg->usage();
+		* =>	arg->usage();
 		}
 	args = arg->argv();
 	if(len args != 1 && len args != 2)
 		arg->usage();
-	remoteaddr = hd args;
+	remoteaddr = dial->netmkaddr(hd args, "net", "venti");
 	if(len args == 2)
-		proxyaddr = hd tl args;
+		proxyaddr = dial->netmkaddr(hd tl args, "net", "venti");
 	if(wflag && proxyaddr == nil)
 		arg->usage();
 	vflag += dflag;
 
-	(lok, lconn) := sys->announce(laddr);
-	if(lok < 0)
+	laddr = dial->netmkaddr(laddr, "tcp", "venti");
+	ac := dial->announce(laddr);
+	if(ac == nil)
 		fail(sprint("announce %s: %r", laddr));
-	verbose(sprint("announced to %s", laddr));
+	vsay(sprint("announced to %s", laddr));
 
 	wrotec = chan of (int, int);
 	registerc = chan of (int, int, chan of ref Vmsg);
@@ -111,22 +121,21 @@ init(nil: ref Draw->Context, args: list of string)
 	proxy = Conn.mk(proxyaddr);
 
 	cacheheads = array[1+maxcachesize/(Dataavgsize*Blocksperhead)] of ref Block;
-	debug(sprint("have %d cacheheads", len cacheheads));
+	say(sprint("have %d cacheheads", len cacheheads));
 
-	spawn central();
+	spawn main();
+	spawn listen(ac);
+}
 
+listen(ac: ref Dial->Connection)
+{
 	for(;;) {
-		debug("listening");
-		(ok, conn) := sys->listen(lconn);
-		if(ok < 0)
+		c := dial->listen(ac);
+		if(c == nil)
 			fail(sprint("listen: %r"));
-		dfd := sys->open(conn.dir+"/data", sys->ORDWR);
-		if(dfd == nil) {
-			verbose(sprint("opening connection: %r"));
-			continue;
-		}
-		debug("have connection");
-		spawn lreader(dfd);
+		say("listening");
+		say("have connection");
+		spawn lreader(c);
 	}
 }
 
@@ -207,44 +216,48 @@ Op: adt {
 	err:	string;
 	flags:	int;
 	s:	ref Score;
-	dtype, dsize:	int;
+	dtype,
+	dsize:	int;
 };
 
 Client: adt {
-	rpid, wpid:	int;
+	rpid,
+	wpid:	int;
 	respc:	chan of ref Vmsg;
 	ntid:	int;	# number of active tids
 };
 
 Conn: adt {
-	fd:	ref Sys->FD;
-	addr:	string;
-	tids:	list of int;
+	fd:		ref Sys->FD;
+	addr:		string;
+	tids:		list of int;
 	pending:	array of ref Op;
-	rpid, wpid:	int;
+	rpid,
+	wpid:	int;
 	claimed:	int;
-	inc, writec:	chan of ref Vmsg;
+	inc,
+	writec:		chan of ref Vmsg;
 	errorc:		chan of int;
 
-	mk:	fn(addr: string): ref Conn;
-	dial:	fn(c: self ref Conn): int;
+	mk:		fn(addr: string): ref Conn;
+	dial:		fn(c: self ref Conn): int;
 	tidsfree:	fn(c: self ref Conn): int;
-	optake:	fn(c: self ref Conn, tid: int): ref Op;
-	opput:	fn(c: self ref Conn, op: ref Op): int;
-	clear:	fn(c: self ref Conn, cc: ref Client);
-	close:	fn(c: self ref Conn, cc: ref Conn);
+	optake:		fn(c: self ref Conn, tid: int): ref Op;
+	opput:		fn(c: self ref Conn, op: ref Op): int;
+	clear:		fn(c: self ref Conn, cc: ref Client);
+	close:		fn(c: self ref Conn, cc: ref Conn);
 };
 
 
 ventidial(addr: string): ref Sys->FD
 {
-	(ok, conn) := sys->dial(addr, nil);
-	if(ok < 0)
+	c := dial->dial(addr, nil);
+	if(c == nil)
 		return nil;
-	session := Session.new(conn.dfd);
+	session := Session.new(c.dfd);
 	if(session == nil)
 		return nil;
-	return conn.dfd;
+	return c.dfd;
 }
 
 Conn.mk(addr: string): ref Conn
@@ -377,14 +390,14 @@ needconn(c: ref Conn, cc: ref Client): int
 {
 	if(c.fd != nil)
 		return 0;
-	verbose(sprint("needconn: dialing %s", c.addr));
+	vsay(sprint("needconn: dialing %s", c.addr));
 	if(c.dial() < 0) {
-		verbose(sprint("needconn: dial failed: %r"));
+		vsay(sprint("needconn: dial failed: %r"));
 		if(cc != nil)
 			killclient(cc);
 		return -1;
 	}
-	verbose("needconn: dial okay");
+	vsay("needconn: dial okay");
 	return 0;
 }
 
@@ -402,7 +415,7 @@ opokay(op: ref Op, vmsg: ref Vmsg): int
 		rscore := Score(sha1(msg.data));
 		return rscore.eq(*op.s);
 	Rwrite =>
-verbose(sprint("opokay, msg.score=%s op.s nil==%d", msg.score.text(), op.s==nil));
+vsay(sprint("opokay, msg.score=%s op.s nil==%d", msg.score.text(), op.s==nil));
 		return msg.score.eq(*op.s);
 	};
 	return 1;
@@ -428,7 +441,7 @@ tick(c: chan of int)
 	}
 }
 
-central()
+main()
 {
 	bogusreqc := chan of (ref Vmsg, int);
 	reqc := requestc;
@@ -438,10 +451,9 @@ central()
 		sys->fprint(sys->fildes(2), "file2chan: %r;  not serving statistics\n");
 		fio = ref sys->FileIO(chan of (int, int, int, sys->Rread), chan of (int, array of byte, int, sys->Rwrite));
 	} else
-		if(dflag) debug(sprint("file2chan: serving %s%s", statsdir, statsfile));
+		if(dflag) say(sprint("file2chan: serving %s%s", statsdir, statsfile));
 
-	debug("central: beginning loop");
-	initheap := heapused();
+	say("main: beginning loop");
 loop:
 	for(;;) {
 		reqc = bogusreqc;
@@ -449,28 +461,27 @@ loop:
 			reqc = requestc;
 		if(clients == nil && remote.fd != nil) {
 			remote.close(nil);
-			debug("central: remote closed");
+			say("main: remote closed");
 		}
 
-		if(dflag) debug(sprint("central: ALT rclaim=%d pclaim=%d rfree=%d pfree=%d",
+		if(dflag) say(sprint("main: ALT rclaim=%d pclaim=%d rfree=%d pfree=%d",
 			remote.claimed, proxy.claimed, remote.tidsfree(), proxy.tidsfree()));
 		alt {
 		(offset, nil, nil, rc) := <- fio.read =>
 			if(rc == nil)
 				continue;
 
-			buf := array of byte sprint(
+			buf := sys->aprint(
 				"%14d clients\n%14d proxy connection\n%14d proxy transitops\n%14d remote connection\n%14d remote transitops\n"+
 				"%14d maxcachesize\n%14d cacheheads\n%14d cacheused\n"+
 				"%14d cachemiss\n%14d cachehit\n%14d cacherequest\n"+
 				"%14d proxymiss\n%14d proxyhit\n%14d proxyrequest\n"+
-				"%14d remotereads\n%14d remotewrites\n"+
-				"%14d heapused\n",
+				"%14d remotereads\n%14d remotewrites\n",
 				len clients, proxy.fd != nil, 256-proxy.tidsfree(), remote.fd != nil, 256-remote.tidsfree(),
 				maxcachesize, len cacheheads, cacheused,
 				cachemiss, cachereq-cachemiss, cachereq,
 				proxymiss, proxyreq-proxymiss, proxyreq,
-				remotereads, remotewrites, heapused()-initheap);
+				remotereads, remotewrites);
 
 			if(offset > len buf)
 				offset = len buf;
@@ -479,24 +490,24 @@ loop:
 		(nil, nil, nil, wc) := <- fio.write =>
 			if(wc == nil)
 				continue;
-			if(dflag) debug("main: file2chan write");
+			if(dflag) say("main: file2chan write");
 			wc <-= (0, Eperm);
 
 		(rpid, wpid, respc) := <- registerc =>
-			verbose("central: new client");
+			vsay("main: new client");
 			clientput(rpid, wpid, respc);
 
 		(vmsg, rpid) := <- reqc =>
-			if(dflag) debug(sprint("central: request from rpid=%d", rpid));
+			if(dflag) say(sprint("main: request from rpid=%d", rpid));
 			c := clientget(rpid);
 			if(vmsg == nil) {
-				verbose("central: error from lreader");
+				vsay("main: error from lreader");
 				killclient(c);
 				continue loop;
 			}
 
 			if(c.ntid == 256) {
-				verbose("central: bad client, already has 256 tids in use!");
+				vsay("main: bad client, already has 256 tids in use!");
 				killclient(c);
 				continue loop;
 			}
@@ -507,18 +518,18 @@ loop:
 				continue loop;
 			}
 				
-			if(dflag) debug("central: before cache");
+			if(dflag) say("main: before cache");
 			pick tmsg := vmsg {
 			Tread =>
 				d := cacheget(tmsg.score, tmsg.etype);
 				if(d != nil) {
 					c.respc <-= ref Vmsg.Rread(0, vmsg.tid, d);
-					if(dflag) debug("central: cache hit");
+					if(dflag) say("main: cache hit");
 					continue loop;
 				}
-				if(dflag) debug("central: cache miss");
+				if(dflag) say("main: cache miss");
 			}
-			if(dflag) debug("central: not in cache");
+			if(dflag) say("main: not in cache");
 
 			score: ref Score;
 			dtype, dsize: int;
@@ -534,14 +545,14 @@ loop:
 			}
 			op: ref Op;
 			if(proxyaddr != nil && (isread || wflag)) {
-				if(dflag) debug("central: using proxy connection");
+				if(dflag) say("main: using proxy connection");
 				cc: ref Client;
 				if(wflag)
 					cc = c;
 				if(needconn(proxy, cc) < 0) {
 					if(wflag)
 						continue loop;
-					if(dflag) debug("central: proxy cache not available, continuing");
+					if(dflag) say("main: proxy cache not available, continuing");
 				} else {
 					op = ref Op(vmsg.tid, c, 1, nil, 0, score, dtype, dsize);
 					vmsg.tid = proxy.opput(op);
@@ -551,11 +562,11 @@ loop:
 						remote.claimed++;
 						continue loop;
 					}
-					if(dflag) debug("central: continuing after proxy");
+					if(dflag) say("main: continuing after proxy");
 				}
 			}
 
-			if(dflag) debug("central: using remote connection");
+			if(dflag) say("main: using remote connection");
 			if(needconn(remote, c) < 0)
 				continue loop;
 
@@ -563,16 +574,16 @@ loop:
 				op = ref Op(vmsg.tid, c, 0, nil, 0, score, dtype, dsize);
 			op.wait++;
 			vmsg.tid = remote.opput(op);
-			if(dflag) debug(sprint("central: rtid=%d", vmsg.tid));
+			if(dflag) say(sprint("main: rtid=%d", vmsg.tid));
 			remote.writec <-= vmsg;
 			case tagof vmsg {
 			tagof Vmsg.Tread =>	remotereads++;
 			tagof Vmsg.Twrite =>	remotewrites++;
 			}
-			if(dflag) debug("central: client request written to remote");
+			if(dflag) say("main: client request written to remote");
 
 		(rpid, ok) := <- wrotec =>
-			if(dflag) debug("central: local writer wrote msg");
+			if(dflag) say("main: local writer wrote msg");
 			c := clientget(rpid);
 			if(c != nil) {
 				if(ok == 0)
@@ -582,9 +593,9 @@ loop:
 			}
 
 		vmsg := <- proxy.inc =>
-			if(dflag) debug("central: vmsg from proxy");
+			if(dflag) say("main: vmsg from proxy");
 			if(vmsg == nil) {
-				verbose("central: proxy read error");
+				vsay("main: proxy read error");
 				proxy.close(remote);
 				continue loop;
 			}
@@ -595,7 +606,7 @@ loop:
 			unclaim(op, Claimremote);
 			op.wait--;
 			if(!nflag && !opokay(op, vmsg)) {
-				verbose("central: proxy sent bad data");
+				vsay("main: proxy sent bad data");
 				if(op.wait == 0)
 					op.c.respc <-= ref Vmsg.Rerror(0, op.ctid, "proxy sent bad data");
 				else
@@ -607,13 +618,13 @@ loop:
 				cacheput(*op.s, op.dtype, rmsg.data);
 			}
 			if(op.flags & Nothing) {
-				if(dflag) debug("central: op says nothing to do");
+				if(dflag) say("main: op says nothing to do");
 				continue loop;
 			}
 			proxyreq++;
 			if(tagof vmsg == tagof Vmsg.Rerror && op.flags&Toremote) {
 				proxymiss++;
-				if(dflag) debug("central: have error from proxy, sending to remote");
+				if(dflag) say("main: have error from proxy, sending to remote");
 				if(needconn(remote, op.c) < 0)
 					continue loop;
 				op.flags |= Claimproxy;
@@ -622,7 +633,7 @@ loop:
 				op.wait++;
 				remote.writec <-= ref Vmsg.Tread(0, rtid, *op.s, op.dtype, op.dsize);
 				remotereads++;
-				if(dflag) debug("central: resent to remote");
+				if(dflag) say("main: resent to remote");
 				continue loop;
 			}
 			pick rmsg := vmsg {
@@ -633,32 +644,32 @@ loop:
 					vmsg = ref Vmsg.Rerror(0, 0, op.err);
 				vmsg.tid = op.ctid;
 				op.c.respc <-= vmsg;
-				if(dflag) debug("central: proxy op handled");
+				if(dflag) say("main: proxy op handled");
 			}
-			if(dflag) debug("central: proxy read handled");
+			if(dflag) say("main: proxy read handled");
 
 		<- proxy.errorc =>
-			verbose("central: proxy write error");
+			vsay("main: proxy write error");
 			proxy.close(remote);
 
 		vmsg := <- remote.inc =>
-			if(dflag) debug("central: vmsg from remote");
+			if(dflag) say("main: vmsg from remote");
 			if(vmsg == nil) {
-				if(vflag) verbose("central: remote read error");
+				if(vflag) vsay("main: remote read error");
 				remote.close(proxy);
 				continue loop;
 			}
 
-			if(dflag) debug(sprint("central: vmsg.tid=%d", vmsg.tid));
+			if(dflag) say(sprint("main: vmsg.tid=%d", vmsg.tid));
 			op := remote.optake(vmsg.tid);
 			if(op == nil) {
-				if(dflag) debug("central: op == nil");
+				if(dflag) say("main: op == nil");
 				continue loop;
 			}
 			unclaim(op, Claimproxy);
 			op.wait--;
 			if(!nflag && !opokay(op, vmsg)) {
-				if(dflag) debug("central: remote sent bad data");
+				if(dflag) say("main: remote sent bad data");
 				if(op.wait == 0)
 					op.c.respc <-= ref Vmsg.Rerror(0, op.ctid, "remote sent bad data");
 				else
@@ -673,7 +684,7 @@ loop:
 				if(proxyaddr != nil && needconn(proxy, nil) >= 0) {
 					ptid := proxy.opput(ref Op(0, nil, 0, nil, Nothing, op.s, 0, 0));
 					proxy.writec <-= ref Vmsg.Twrite(1, ptid, op.dtype, r.data);
-					if(dflag) debug("central: wrote data from remote to proxy");
+					if(dflag) say("main: wrote data from remote to proxy");
 				}
 			Rerror =>
 				op.err = r.e;
@@ -683,12 +694,12 @@ loop:
 					vmsg = ref Vmsg.Rerror(0, 0, op.err);
 				vmsg.tid = op.ctid;
 				op.c.respc <-= vmsg;
-				if(dflag) debug("central: op done after remote read");
+				if(dflag) say("main: op done after remote read");
 			}
-			if(dflag) debug("central: remote read okay");
+			if(dflag) say("main: remote read okay");
 
 		<- remote.errorc =>
-			verbose("central: remote writer error");
+			vsay("main: remote writer error");
 			remote.close(proxy);
 		}
 	}
@@ -696,16 +707,18 @@ loop:
 
 readline(fd: ref Sys->FD): array of byte
 {
-	buf := array[128]  of byte;
-	for(i := 0; i < len buf; i++) {
-		n := sys->read(fd, buf[i:], 1);
-		if(n == 0)
+	buf := array[128] of byte;
+	for(i := 0; i < len buf; i++)
+		case sys->read(fd, buf[i:], 1) {
+		0 =>
 			sys->werrstr("eof");
-		if(n != 1)
 			return nil;
-		if(buf[i] == byte '\n')
-			return buf[:i];
-	}
+		1 =>
+			if(buf[i] == byte '\n')
+				return buf[:i];
+		* =>
+			return nil;
+		}
 	sys->werrstr("version line too long");
 	return nil;
 }
@@ -735,15 +748,16 @@ handshake(fd: ref Sys->FD): string
 	return nil;
 }
 
-lreader(fd: ref Sys->FD)
+lreader(c: ref dial->Connection)
 {
-	debug("lreader: starting");
+	fd := dial->accept(c);
+	if(fd == nil)
+		return vsay(sprint("accept: %r"));
+	say("lreader: starting");
 	herr := handshake(fd);
-	if(herr != nil) {
-		verbose(sprint("lreader: handshake: %s", herr));
-		return;
-	}
-	debug("lreader: have handshake");
+	if(herr != nil)
+		return vsay(sprint("lreader: handshake: %s", herr));
+	say("lreader: have handshake");
 
 	rpid := sys->pctl(0, nil);
 	spawn lwriter(fd, rpid, pidc := chan of int, respc := chan[256] of ref Vmsg);
@@ -758,7 +772,7 @@ lreader(fd: ref Sys->FD)
 		if(vmsg != nil && tagof vmsg == tagof Vmsg.Tgoodbye)
 			err = "lreader closing down";
 		if(err != nil || vmsg == nil) {
-			verbose("lreader: reading: "+err);
+			vsay("lreader: reading: "+err);
 			requestc <-= (nil, rpid);
 			break;
 		}
@@ -775,7 +789,7 @@ lwriter(fd: ref Sys->FD, rpid: int, pidc: chan of int, respc: chan of ref Vmsg)
 			break;
 		d := vmsg.pack();
 		if(sys->write(fd, d, len d) != len d) {
-			verbose(sprint("lwriter: writing: %r"));
+			vsay(sprint("lwriter: writing: %r"));
 			wrotec <-= (rpid, 0);
 			break;
 		}
@@ -792,10 +806,10 @@ vreader(pidc: chan of int, fd: ref Sys->FD, inc: chan of ref Vmsg)
 			err = "received tmsg, expected rmsg";
 		if(err != nil) {
 			vmsg = nil;
-			verbose("vreader: "+err);
+			vsay("vreader: "+err);
 		}
 if(vmsg != nil)
-	if(dflag) debug(sprint("vreader: have msg tid=%d tag=%d tagthello=%d", vmsg.tid, tagof vmsg, tagof Vmsg.Thello));
+	if(dflag) say(sprint("vreader: have msg tid=%d tag=%d tagthello=%d", vmsg.tid, tagof vmsg, tagof Vmsg.Thello));
 		inc <-= vmsg;
 		if(vmsg == nil)
 			break;
@@ -809,61 +823,44 @@ vwriter(pidc: chan of int, fd: ref Sys->FD, outc: chan of ref Vmsg, errorc: chan
 		vmsg := <- outc;
 		if(vmsg == nil)
 			break;
-if(dflag) debug(sprint("vwriter: have msg tid=%d tag=%d tagthello=%d", vmsg.tid, tagof vmsg, tagof Vmsg.Thello));
+if(dflag) say(sprint("vwriter: have msg tid=%d tag=%d tagthello=%d", vmsg.tid, tagof vmsg, tagof Vmsg.Thello));
 		d := vmsg.pack();
 		if(sys->write(fd, d, len d) != len d) {
-			verbose(sprint("vwriter: writing: %r"));
+			vsay(sprint("vwriter: writing: %r"));
 			errorc <-= 0;
 			break;
 		}
 	}
 }
 
-mfd: ref Sys->FD;
-
-heapused(): int
-{
-	if(mfd == nil)
-		mfd = sys->open("/dev/memory", sys->OREAD);
-        if(mfd == nil)
-               fail(sprint("open /dev/memory: %r")); 
-        sys->seek(mfd, big 0, Sys->SEEKSTART);
-
-        buf := array[400] of byte;
-        n := sys->read(mfd, buf, len buf);
-        if(n <= 0)
-                fail(sprint("reading /dev/memory: %r"));
-
-        (nil, l) := sys->tokenize(string buf[0:n], "\n");
-        for(; l != nil; l = tl l)
-                if((hd l)[7*12:] == "heap")
-			return int ((hd l)[0:12]);
-	fail("missing heap line in /dev/memory");
-	return 0;
-}
-
 kill(pid: int)
 {
-	cfd := sys->open(sprint("/prog/%d/ctl", pid), sys->OWRITE);
-	if(cfd != nil)
-		sys->fprint(cfd, "kill");
-	verbose(sprint("killed pid %d", pid));
+	sys->fprint(sys->open(sprint("/prog/%d/ctl", pid), sys->OWRITE), "kill");
+	vsay(sprint("killed pid %d", pid));
+}
+
+fd2: ref Sys->FD;
+warn(s: string)
+{
+	if(fd2 == nil)
+		fd2 = sys->fildes(2);
+	sys->fprint(fd2, "%s\n", s);
+}
+
+vsay(s: string)
+{
+	if(vflag)
+		warn(s);
+}
+
+say(s: string)
+{
+	if(dflag)
+		warn(s);
 }
 
 fail(s: string)
 {
-	sys->fprint(sys->fildes(2), "%s\n", s);
+	warn(s);
 	raise "fail:"+s;
-}
-
-verbose(s: string)
-{
-	if(vflag)
-		sys->fprint(sys->fildes(2), "%s\n", s);
-}
-
-debug(s: string)
-{
-	if(dflag)
-		sys->fprint(sys->fildes(2), "%s\n", s);
 }

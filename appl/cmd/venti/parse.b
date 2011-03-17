@@ -220,6 +220,10 @@ printdirentry(de: ref Direntry)
 	sys->print("\tctime=%d\n", de.ctime);
 	sys->print("\tatime=%d\n", de.atime);
 	sys->print("\tmode=%x\n", de.mode);
+#	if(de.qidspace) {
+#		sys->print("\tqidoff=%bd\n", de.qidoff);
+#		sys->print("\tqidmax=%bd\n", de.qidmax);
+#	}
 }
 
 metablock(d: array of byte)

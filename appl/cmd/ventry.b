@@ -8,6 +8,8 @@ include "arg.m";
 include "bufio.m";
 	bufio: Bufio;
 	Iobuf: import bufio;
+include "dial.m";
+	dial: Dial;
 include "venti.m";
 	venti: Venti;
 	Score, Session, Entrysize, Datatype, Dirtype: import venti;
@@ -19,7 +21,7 @@ Ventry: module {
 	init:	fn(nil: ref Draw->Context, args: list of string);
 };
 
-addr := "net!$venti!venti";
+addr := "$venti";
 dflag := 0;
 
 init(nil: ref Draw->Context, args: list of string)
@@ -27,6 +29,7 @@ init(nil: ref Draw->Context, args: list of string)
 	sys = load Sys Sys->PATH;
 	arg := load Arg Arg->PATH;
 	bufio = load Bufio Bufio->PATH;
+	dial = load Dial Dial->PATH;
 	venti = load Venti Venti->PATH;
 	venti->init();
 	vac = load Vac Vac->PATH;
@@ -51,10 +54,11 @@ init(nil: ref Draw->Context, args: list of string)
 		fail("bad score: "+hd args);
 
 	say("dialing");
-	(cok, conn) := sys->dial(addr, nil);
-	if(cok < 0)
+	addr = dial->netmkaddr(addr, "net", "venti");
+	cc := dial->dial(addr, nil);
+	if(cc == nil)
 		fail(sprint("dialing %s: %r", addr));
-	fd := conn.dfd;
+	fd := cc.dfd;
 	say("have connection");
 
 	session := Session.new(fd);

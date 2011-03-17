@@ -8,6 +8,8 @@ include "bufio.m";
 	bufio: Bufio;
 	Iobuf: import bufio;
 include "arg.m";
+include "dial.m";
+	dial: Dial;
 include "string.m";
 	str: String;
 include "venti.m";
@@ -30,6 +32,7 @@ init(nil: ref Draw->Context, args: list of string)
 	sys = load Sys Sys->PATH;
 	bufio = load Bufio Bufio->PATH;
 	arg := load Arg Arg->PATH;
+	dial = load Dial Dial->PATH;
 	str = load String String->PATH;
 	venti = load Venti Venti->PATH;
 	venti->init();
@@ -68,8 +71,8 @@ init(nil: ref Draw->Context, args: list of string)
 		fail("bad score: "+scorestr);
 	say("have score");
 
-	srcs = dial(srcaddr);
-	dsts = dial(dstaddr);
+	srcs = vdial(srcaddr);
+	dsts = vdial(dstaddr);
 
 	walk(score, t, 0);
 	say("have walk");
@@ -150,14 +153,15 @@ isnul(s: Score): int
 	return 1;
 }
 
-dial(addr: string): ref Session
+vdial(addr: string): ref Session
 {
-	(cok, conn) := sys->dial(addr, nil);
-	if(cok < 0)
+	addr = dial->netmkaddr(addr, "net", "venti");
+	cc := dial->dial(addr, nil);
+	if(cc == nil)
 		fail(sprint("dialing %s: %r", addr));
 	say("have connection");
 
-	session = Session.new(conn.dfd);
+	session = Session.new(cc.dfd);
 	if(session == nil)
 		fail(sprint("handshake: %r"));
 	say("have handshake");

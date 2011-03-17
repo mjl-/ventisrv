@@ -8,6 +8,8 @@ include "bufio.m";
 	bufio: Bufio;
 	Iobuf: import bufio;
 include "arg.m";
+include "dial.m";
+	dial: Dial;
 include "venti.m";
 	venti: Venti;
 	Score, Session, Dirtype, Datatype: import venti;
@@ -19,7 +21,7 @@ Ventiput: module {
 	init:	fn(nil: ref Draw->Context, args: list of string);
 };
 
-addr := "net!$venti!venti";
+addr := "$venti";
 dflag := 0;
 blocksize := Vac->Dsize;
 session: ref Session;
@@ -29,6 +31,7 @@ init(nil: ref Draw->Context, args: list of string)
 	sys = load Sys Sys->PATH;
 	bufio = load Bufio Bufio->PATH;
 	arg := load Arg Arg->PATH;
+	dial = load Dial Dial->PATH;
 	venti = load Venti Venti->PATH;
 	venti->init();
 	vac = load Vac Vac->PATH;
@@ -47,12 +50,13 @@ init(nil: ref Draw->Context, args: list of string)
 	if(len args != 0)
 		arg->usage();
 
-	(cok, conn) := sys->dial(addr, nil);
-	if(cok < 0)
+	addr = dial->netmkaddr(addr, "net", "venti");
+	cc := dial->dial(addr, nil);
+	if(cc == nil)
 		error(sprint("dialing %s: %r", addr));
 	say("have connection");
 
-	session = Session.new(conn.dfd);
+	session = Session.new(cc.dfd);
 	if(session == nil)
 		error(sprint("handshake: %r"));
 	say("have handshake");

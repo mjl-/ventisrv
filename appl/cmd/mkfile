@@ -19,8 +19,6 @@ SYSMODULES=\
 	draw.m\
 	keyring.m\
 	string.m\
-	styx.m\
-	styxservers.m\
 	sys.m\
 	vac.m\
 	venti.m\

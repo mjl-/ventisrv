@@ -4,9 +4,6 @@ include "sys.m";
 	sys: Sys;
 	sprint: import sys;
 include "draw.m";
-include "bufio.m";
-	bufio: Bufio;
-	Iobuf: import bufio;
 include "arg.m";
 include "dial.m";
 	dial: Dial;
@@ -23,14 +20,14 @@ Venticopy: module {
 	init:	fn(nil: ref Draw->Context, args: list of string);
 };
 
-dflag, fflag: int;
-session: ref Session;
-srcs, dsts: ref Session;
+dflag: int;
+fflag: int;
+srcs: ref Session;
+dsts: ref Session;
 
 init(nil: ref Draw->Context, args: list of string)
 {
 	sys = load Sys Sys->PATH;
-	bufio = load Bufio Bufio->PATH;
 	arg := load Arg Arg->PATH;
 	dial = load Dial Dial->PATH;
 	str = load String String->PATH;
@@ -40,7 +37,7 @@ init(nil: ref Draw->Context, args: list of string)
 	vac->init();
 
 	arg->init(args);
-	arg->setusage(sprint("%s [-df] srcaddr dstaddr [vac:]score", arg->progname()));
+	arg->setusage(arg->progname()+" [-df] srcaddr dstaddr [vac:]score");
 	while((c := arg->opt()) != 0)
 		case c {
 		'd' =>	dflag++;
@@ -53,86 +50,88 @@ init(nil: ref Draw->Context, args: list of string)
 
 	srcaddr := hd args;
 	dstaddr := hd tl args;
-	args = tl tl args;
+	ts := hd tl tl args;
 
-	(tag, scorestr) := str->splitstrr(hd args, ":");
-	if(tag != nil)
-		tag = tag[:len tag-1];
+	(tag, ss) := str->splitstrr(ts, ":");
 	t: int;
 	case tag {
-	"vac" =>	t = Roottype;
-	"entry" =>	t = Dirtype;
-	* =>	sys->fprint(sys->fildes(2), "bad score type\n");
-		arg->usage();
+	"vac:" =>	t = venti->Roottype;
+	"entry:" =>	t = venti->Dirtype;
+	* =>		fail("bad score type");
 	}
-
-	(sok, score) := Score.parse(scorestr);
-	if(sok != 0)
-		fail("bad score: "+scorestr);
-	say("have score");
+	(ok, score) := Score.parse(ss);
+	if(ok != 0)
+		fail("bad score: "+ss);
 
 	srcs = vdial(srcaddr);
 	dsts = vdial(dstaddr);
-
 	walk(score, t, 0);
-	say("have walk");
-
 	if(dsts.sync() < 0)
 		fail(sprint("syncing destination: %r"));
-	say("synced");
+}
+
+vdial(addr: string): ref Session
+{
+	addr = dial->netmkaddr(addr, "net", "venti");
+	c := dial->dial(addr, nil);
+	if(c == nil)
+		fail(sprint("dialing %s: %r", addr));
+
+	s := Session.new(c.dfd);
+	if(s == nil)
+		fail(sprint("handshake: %r"));
+	return s;
 }
 
 walk(s: Score, t, dt: int)
 {
 	say(sprint("walk: %s/%d", s.text(), t));
 
-	if(fflag && dsts.read(s, t, Venti->Maxlumpsize) != nil) {
-		say(sprint("skipping %s/%d", s.text(), t));
-		return;
-	}
+	if(fflag && dsts.read(s, t, venti->Maxlumpsize) != nil)
+		return say(sprint("skipping %s/%d", s.text(), t));
 
-	d := srcs.read(s, t, Venti->Maxlumpsize);
+	d := srcs.read(s, t, venti->Maxlumpsize);
 	if(d == nil)
 		fail(sprint("reading %s/%d: %r", s.text(), t));
 
 	case t {
-	Roottype =>
+	venti->Roottype =>
 		r := Root.unpack(d);
 		if(r == nil)
 			fail(sprint("bad root: %r"));
-		walk(r.score, Dirtype, 0);
+		walk(r.score, venti->Dirtype, 0);
 		if(!isnul(*r.prev))
-			walk(*r.prev, Roottype, 0);
+			walk(*r.prev, venti->Roottype, 0);
 
-	Dirtype =>
+	venti->Dirtype =>
 		for(o := 0; o+Entrysize <= len d; o += Entrysize) {
 			e := Entry.unpack(d[o:o+Entrysize]);
 			if(e == nil)
 				fail(sprint("bad entry: %r"));
-			if(!(e.flags&Venti->Entryactive))
+			if(!(e.flags&venti->Entryactive))
 				continue;
-			nt := Datatype;
-			if(e.flags&Venti->Entrydir)
-				nt = Dirtype;
+			nt := venti->Datatype;
+			if(e.flags&venti->Entrydir)
+				nt = venti->Dirtype;
 			if(e.depth == 0)
 				walk(e.score, nt, 0);
 			else
-				walk(e.score, Pointertype0-1+e.depth, nt);
+				walk(e.score, venti->Pointertype0-1+e.depth, nt);
 		}
 		
-	Pointertype0 to Pointertype6 =>
+	venti->Pointertype0 to venti->Pointertype6 =>
 		nt := t-1;
 		for(o := 0; o+Scoresize <= len d; o += Scoresize) {
 			ns := Score(d[o:o+Scoresize]);
 			if(ns.eq(Score.zero()))
 				continue;
-			if(t == Pointertype0)
+			if(t == venti->Pointertype0)
 				nt = dt;
 			walk(ns, nt, dt);
 		}
 
-	Datatype =>
-		;
+	venti->Datatype =>
+		{}
 
 	* =>
 		fail(sprint("unknown block type, %s/%d", s.text(), t));
@@ -153,29 +152,19 @@ isnul(s: Score): int
 	return 1;
 }
 
-vdial(addr: string): ref Session
+say(s: string)
 {
-	addr = dial->netmkaddr(addr, "net", "venti");
-	cc := dial->dial(addr, nil);
-	if(cc == nil)
-		fail(sprint("dialing %s: %r", addr));
-	say("have connection");
+	if(dflag)
+		warn(s);
+}
 
-	session = Session.new(cc.dfd);
-	if(session == nil)
-		fail(sprint("handshake: %r"));
-	say("have handshake");
-	return session;
+warn(s: string)
+{
+	sys->fprint(sys->fildes(2), "%s\n", s);
 }
 
 fail(s: string)
 {
-	sys->fprint(sys->fildes(2), "%s\n", s);
+	warn(s);
 	raise "fail:"+s;
-}
-
-say(s: string)
-{
-	if(dflag)
-		sys->fprint(sys->fildes(2), "%s\n", s);
 }

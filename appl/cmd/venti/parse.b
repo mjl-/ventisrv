@@ -117,18 +117,19 @@ guesstype(d: array of byte): string
 
 read(): array of byte
 {
+	fd0 := sys->fildes(0);
 	d := array[0] of byte;
-	buf := array[8*1024] of byte;
+	buf := array[sys->ATOMICIO] of byte;
 	for(;;) {
-		n := sys->read(sys->fildes(0), buf, len buf);
+		n := sys->read(fd0, buf, len buf);
 		if(n == 0)
 			break;
 		if(n < 0)
 			fail(sprint("reading data: %r"));
-		newd := array[len d+n] of byte;
-		newd[:] = d;
-		newd[len d:] = buf[:n];
-		d = newd;
+		nd := array[len d+n] of byte;
+		nd[:] = d;
+		nd[len d:] = buf[:n];
+		d = nd;
 	}
 	return d;
 }
@@ -211,7 +212,7 @@ printdirentry(de: ref Direntry)
 	sys->print("\tgen=%d\n", de.gen);
 	sys->print("\tmentry=%d\n", de.mentry);
 	sys->print("\tmgen=%d\n", de.mgen);
-	sys->print("\tqid=%bd\n", de.qid);
+	sys->print("\tqid=%bux\n", de.qid);
 	sys->print("\tuid=%s\n", de.uid);
 	sys->print("\tgid=%s\n", de.gid);
 	sys->print("\tmid=%s\n", de.mid);

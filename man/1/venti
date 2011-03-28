@@ -1,6 +1,6 @@
 .TH VENTI 1
 .SH NAME
-venti/read, venti/write, venti/sync, venti/ping, venti/get, venti/put, venti/copy, venti/parse \- venti utilities
+venti/read, venti/write, venti/sync, venti/ping, venti/get, venti/put, venti/copy, venti/stream, venti/parse \- venti utilities
 .SH SYNOPSIS
 .B venti/read
 [
@@ -70,6 +70,14 @@ venti/read, venti/write, venti/sync, venti/ping, venti/get, venti/put, venti/cop
 .I dstaddr
 .I [tag:]score
 .br
+.B venti/stream
+[
+.B -dOtv
+]
+.I srcaddr
+.I dstaddr
+.I [tag:]score
+.br
 .B venti/parse
 [
 .I type
@@ -115,6 +123,15 @@ can be either
 or
 .IR entry .
 .PP
+.I Venti/stream
+is like
+.IR venti/copy ,
+but keeps up to 256 outstanding requests to
+.I srcaddr
+and
+.I dstaddr
+to get reasonable throughput on high-latency connections.
+.PP
 .I Venti/parse
 parses and prints the data structure it reads from standard input.
 .I Type
@@ -156,6 +173,27 @@ Send
 pings to the venti server.  The default is three.  When set to zero,
 .I venti/ping
 pings until interrupted.
+.TP
+.B -O
+Do not recursively copy the `previous root score' found in vac root scores.
+Only for
+.IR venti/stream .
+.TP
+.B -t
+Print traces of venti messages.
+Only for
+.IR venti/stream .
+.TP
+.B -v
+Be verbose.
+Only for
+.IR venti/stream ,
+a single
+.B -v
+prints two lines with statistics when finished.
+Another
+.B -v
+also prints statistics about the types of data blocks that were copied.
 .SH SOURCE
 .B /appl/cmd/venti/read.b
 .br
@@ -170,6 +208,10 @@ pings until interrupted.
 .B /appl/cmd/venti/put.b
 .br
 .B /appl/cmd/venti/parse.b
+.br
+.B /appl/cmd/venti/copy.b
+.br
+.B /appl/cmd/venti/stream.b
 .SH SEE ALSO
 .IR vcache (1),
 .IR venti (2),

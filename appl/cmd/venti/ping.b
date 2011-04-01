@@ -23,6 +23,7 @@ init(nil: ref Draw->Context, args: list of string)
 {
 	sys = load Sys Sys->PATH;
 	arg := load Arg Arg->PATH;
+	dial = load Dial Dial->PATH;
 	venti = load Venti Venti->PATH;
 	venti->init();
 

@@ -17,6 +17,7 @@ SYSMODULES=\
 	daytime.m\
 	dial.m\
 	draw.m\
+	env.m\
 	keyring.m\
 	string.m\
 	sys.m\

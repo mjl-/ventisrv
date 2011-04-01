@@ -160,6 +160,15 @@ Only for
 Dial
 .I address
 instead of the default venti server.
+All tools dial the ndb name
+.I $venti
+by default.
+.I Venti/read
+and
+.I venti/write
+will instead use environment variable
+.I $venti
+if it is set.
 .TP
 .BI -b " blocksize"
 Use blocks with

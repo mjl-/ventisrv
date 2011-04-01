@@ -7,6 +7,8 @@ include "draw.m";
 include "arg.m";
 include "dial.m";
 	dial: Dial;
+include "env.m";
+	env: Env;
 include "venti.m";
 	venti: Venti;
 	Score, Session: import venti;
@@ -23,8 +25,13 @@ init(nil: ref Draw->Context, args: list of string)
 	sys = load Sys Sys->PATH;
 	arg := load Arg Arg->PATH;
 	dial = load Dial Dial->PATH;
+	env = load Env Env->PATH;
 	venti = load Venti Venti->PATH;
 	venti->init();
+
+	ev := env->getenv("venti");
+	if(ev != nil)
+		addr = ev;
 
 	arg->init(args);
 	arg->setusage(arg->progname() + " [-d] [-a addr] type score");
